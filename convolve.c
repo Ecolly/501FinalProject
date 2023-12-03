@@ -79,15 +79,21 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     fread(&IR_header, sizeof(IR_header), 1, IRFileStream);
     fwrite(&input_header, sizeof(input_header), 1, outputFileStream);
 
-    // at this point you may print out some information about your input_header to ensure the correct information has been read in
-    printf("audio format: %s\n", input_header.format); // prints some junk as no null terminator
+    //input file information
+    printf("///////////////Input information//////////////////////// \n");
+    printf("audio format: %s\n", input_header.format); 
     printf("number of channels: %d\n", input_header.num_channels);
     printf("size of subchunk1: %d\n", input_header.subchunk1_size);
+
+    printf("///////////////IR information////////////////////////\n");
+    printf("audio format: %s\n", IR_header.format); 
+    printf("number of channels: %d\n", IR_header.num_channels);
+    printf("size of subchunk1: %d\n", IR_header.subchunk1_size);
 
     if (input_header.subchunk1_size != 16){
         // the remaining bytes in subchunk1 will be null bytes if there is more than 16
         // so read the junk!
-        printf("subchunk1 is too big! Skipping some bytes!\n");
+        printf("input subchunk1 is too big! Skipping some bytes!\n");
         int remainder = input_header.subchunk1_size -16;
         char randomVar[remainder];
         fread(randomVar, remainder, 1, inputFileStream);
@@ -96,94 +102,96 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     if (IR_header.subchunk1_size != 16){
         // the remaining bytes in subchunk1 will be null bytes if there is more than 16
         // so read the junk!
-        printf("subchunk1 is too big! Skipping some bytes!\n");
+        printf("IR subchunk1 is too big! Skipping some bytes!\n");
         int remainder = IR_header.subchunk1_size -16;
         char randomVar[remainder];
         fread(randomVar, remainder, 1, IRFileStream);
     }
-
-    char subchunk2_id_input[4];
-    int subchunk2_size_input; // an integer is 4 bytes
-    char subchunk2_id_IR[4];
+    // an integer is 4 bytes
+    char subchunk2_id_input[4]; //"data"
+    int subchunk2_size_input;   //size of subchunk in bytes
+    char subchunk2_id_IR[4];    //"data"
     int subchunk2_size_IR; 
     
+    //copying the "Data" chunk identifier and its size to the input wav to the output wav
     fread(&subchunk2_id_input, sizeof(subchunk2_id_input), 1, inputFileStream);
     fread(&subchunk2_size_input, sizeof(subchunk2_size_input), 1, inputFileStream);
     fread(&subchunk2_id_IR, sizeof(subchunk2_id_IR), 1, IRFileStream);
     fread(&subchunk2_size_IR, sizeof(subchunk2_size_IR), 1, IRFileStream);
-
+    //write to output file
     fwrite(&subchunk2_id_input, sizeof(subchunk2_id_input), 1, outputFileStream);
     fwrite(&subchunk2_size_input, sizeof(subchunk2_size_input), 1, outputFileStream);
 
-    int num_input = subchunk2_size_input / (input_header.bits_per_sample / 8);
-    int num_IR = subchunk2_size_IR / (IR_header.bits_per_sample / 8);
+    //number of audio sample in input and IR, number of bytes
+    int num_samples_input = subchunk2_size_input / (input_header.bits_per_sample / 8);
+    //total bytes/(byte per sample) = number of samples of adudio
+    int num_samples_IR = subchunk2_size_IR / (IR_header.bits_per_sample / 8);
+    int num_output = num_samples_input + num_samples_IR -1;
 
-    size_t data_size_input = subchunk2_size_input;
+    //represent the size in bytes of data
+    size_t data_size_input = subchunk2_size_input; //var = bytes
     size_t data_size_IR = subchunk2_size_IR;
 
-    short *audio_data = (short *)malloc(data_size_input); // allocate a bunch of space to hold all of the audio data
+    //calculate datasize for output file:
+    //output Datasize =(IRNumSamples+DryNumSamples−1)×Channels×BytesPerSample
+    size_t data_size_output = num_output*input_header.num_channels*(input_header.bits_per_sample/8);
+
+    
+    // allocate a bunch of space to hold all of the audio data
+    //allocate memory blocks to store arrays of short integers
+    short *audio_data = (short *)malloc(data_size_input);
     short *IR_data = (short *)malloc(data_size_IR);
 
     // Print out some more info
     printf("bits per sample: %d\n", input_header.bits_per_sample);
     printf("subchunk2 size: %d\n", subchunk2_size_input);
-    printf("number of samples: %d\n", num_input);
+    printf("number of samples: %d\n", num_samples_input);
 
     // // read it into an array of shorts
     fread(audio_data, sizeof(short), data_size_input, inputFileStream);
     fread(IR_data, sizeof(short), data_size_IR, IRFileStream);
 
-    // for (int i = 0; i < data_size_input; i++) {
-    //     printf("%d\n", audio_data[i]);
-    // }
+    float *audioFloats = (float *)malloc(data_size_input/sizeof(short)*sizeof(float));
+    float *IRFloats = (float *)malloc(data_size_IR/sizeof(short)*sizeof(float));
+    float *outputFloats = (float *)malloc(data_size_output/sizeof(short)*sizeof(float));
 
-
-    //convert the array of shorts into floats
-    
-    // size_t data_size_input_float = subchunk2_size_input * sizeof(float);
-    // size_t data_size_IR_float = subchunk2_size_IR* sizeof(float);
-
-    float *audioFloats = (float *)malloc(data_size_input);
-    float *IRFloats = (float *)malloc(data_size_IR);
-    
-    //float *outputFloats = (float *)malloc((data_size_input * sizeof(float))/2);
-
-
-
-    for (int i = 0; i < (data_size_input); i++) {
-        short s = audio_data[i];
-        audioFloats[i] = shortToFloat(s);
+    for (int i = 0; i < num_samples_input; i++) {
+        //printf("%d",audio_data[i]);
+        audioFloats[i] = shortToFloat(audio_data[i]);
+        printf("%f", audioFloats[i]);
+    }
+    for (int i = 0; i < num_samples_IR; i++) {
+        IRFloats[i] = shortToFloat(IR_data[i]);
+        //printf("%f", IRFloats[i]);
     }
 
-    for (int i = 0; i < (data_size_IR); i++) {
-        short s = IR_data[i];
-        IRFloats[i] = shortToFloat(s);
+    short data;
+    convolve(audioFloats, num_samples_input, IRFloats, num_samples_IR, outputFloats , num_output);
+    for (int i =0; i<num_output;i++){
+        data = (short)(outputFloats[i]*32768);
+        fwrite(&data,sizeof(data),1,outputFileStream);
     }
-    // printFloatArray(audioFloats, data_size_input);
 
-
-
-
-    free (audio_data);
-    free (IR_data);
-
+    free(audio_data);
+    // free (audio_data_bytes);
+    // free (IR_data_bytes);
     free(audioFloats);
-    free(IRFloats);
+    // free(IRFloats);
     // Close the files
     fclose(inputFileStream);
     fclose(outputFileStream);
 }
 
 
-// float bytesToFloat(char firstByte, char secondByte) {
-//     // Convert two bytes to one short (little endian)
-//     short s = (secondByte << 8) | firstByte;
-//     // Convert to range from -1 to (just below) 1
-//     return s / 32768.0;
-// }
+float bytesToFloat(char firstByte, char secondByte) {
+    // Convert two bytes to one short (little endian)
+    short s = (secondByte << 8) | firstByte;
+    // Convert to range from -1 to (just below) 1
+    return s / 1.0;
+}
 float shortToFloat(short s) {
     // Convert to range from -1 to (just below) 1
-    return s / 32768.0/2; //scale down the numbers
+    return s / 32768.0/2;//scale down the numbers
 }
 
 void convolve(float x[], int N, float h[], int M, float y[], int P)
