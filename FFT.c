@@ -178,18 +178,18 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     //start
     int K_input = next_power_of_2(2*num_samples_input); //could be just the max of 2 samples??
     
-    double *audioDouble = (double *)calloc(2*K_input,sizeof(double));
+    double *audioDouble = (double *)calloc((2*K_input),sizeof(double));
     for(int i=0; i< num_samples_input; i++)
     {
-        audioDouble[2*i] = audio_data[i]/32768.0;
-        audioDouble[2*i+1] = 0.0;
+        audioDouble[(i<<1)] = audio_data[i]/32768.0;
+        audioDouble[(i<<1)+1] = 0.0;
     }
    
     double *IRDouble = (double *)calloc(2*K_input,sizeof(double));
     for(int i=0; i< num_samples_IR; i++)
     {
-        IRDouble[2*i] = (double)IR_data[i]/32768.0;
-        IRDouble[2*i+1] = 0.0;
+        IRDouble[(i<<1)] = (double)IR_data[i]/32768.0;
+        IRDouble[(i<<1)+1] = 0.0;
     }
 
 
