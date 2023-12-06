@@ -151,14 +151,14 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     // // read it into an array of shorts
     fread(audio_data, sizeof(short), data_size_input, inputFileStream);
     fread(IR_data, sizeof(short), data_size_IR, IRFileStream);
-    printf("\n input: %d", audio_data[80000]);
+    //printf("\n input: %d", audio_data[80000]);
 
     float *audioFloats = (float *)malloc(data_size_input/sizeof(short)*sizeof(float));
     float *IRFloats = (float *)malloc(data_size_IR/sizeof(short)*sizeof(float));
     float *outputFloats = (float *)malloc(data_size_output/sizeof(short)*sizeof(float));
         
     for (int i = 0; i < num_samples_input; i++) {
-        printf("\n input: %d", audio_data[80000]);
+        //printf("\n input: %d", audio_data[80000]);
         audioFloats[i] = shortToFloat(audio_data[i]);
         //printf("\n input: %f", audioFloats[i]);
     }
