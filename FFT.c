@@ -18,6 +18,10 @@
 #include <math.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
+
+#define SWAP(a,b)  tempr=(a);(a)=(b);(b)=tempr
+
 // struct to hold all data up until the end of subchunk1
 // you still have 8 bytes to read before actual data, namely being subchunk2ID & subChunk2Size
 // note it may actually be more than 8 bytes as subchunk1size may not be 16!
@@ -38,10 +42,14 @@ typedef struct {
 // Function definitions (:
 void readTone(char *inputFileName,char *IRFileName, char *outputFileName);
 float bytesToFloat(char firstByte, char secondByte) ;
-void convolve(float x[], int N, float h[], int M, float y[], int P);
 void printFloatArray(const float arr[], int size);
 float shortToFloat(short s);
 float findMaxFloat(float arr[], int n);
+void four1(double data[], int nn, int isign);
+void pad_zeros_to(double *arr, int current_length, int M);
+int next_power_of_2(int n);
+void convolution(double *x, int K, double *h, double *y);
+
 int main (int argc, char *argv[])
 {
     char *inputFileName = NULL;
@@ -65,6 +73,7 @@ int main (int argc, char *argv[])
     }
 
     readTone(inputFileName, IRFileName, outputFileName);
+    return 0;
 }
 
 void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
@@ -146,88 +155,175 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     // Print out some more info
     printf("bits per sample: %d\n", input_header.bits_per_sample);
     printf("subchunk2 size: %d\n", subchunk2_size_input);
-    printf("number of samples: %d\n", num_samples_input);
+    printf("number of DW samples: %d\n", num_samples_input);
+     printf("number of IR samples: %d\n", num_samples_IR);
 
+    
     // // read it into an array of shorts
     fread(audio_data, sizeof(short), data_size_input, inputFileStream);
     fread(IR_data, sizeof(short), data_size_IR, IRFileStream);
+    // for (int i = 0; i < num_samples_input; i++) {
+    //     printf("\n input: %d", audio_data[i]);
+    // }
+    // for (int i = 0; i < num_samples_IR; i++) {
+    //     printf("\n IR: %d", IR_data[i]);
+    // }
     printf("\n input: %d", audio_data[80000]);
+   
+    //both arrays should be prepared for FFT
+    //zero padding them to same length so that the length is a power of 2
 
-    float *audioFloats = (float *)malloc(data_size_input/sizeof(short)*sizeof(float));
-    float *IRFloats = (float *)malloc(data_size_IR/sizeof(short)*sizeof(float));
-    float *outputFloats = (float *)malloc(data_size_output/sizeof(short)*sizeof(float));
-        
-    for (int i = 0; i < num_samples_input; i++) {
-        printf("\n input: %d", audio_data[80000]);
-        audioFloats[i] = shortToFloat(audio_data[i]);
-        //printf("\n input: %f", audioFloats[i]);
+
+
+    //start
+    int K_input = next_power_of_2(2*num_samples_input); //could be just the max of 2 samples??
+    
+    double *audioDouble = (double *)calloc(2*K_input,sizeof(double));
+    for(int i=0; i< num_samples_input; i++)
+    {
+        audioDouble[2*i] = audio_data[i]/32768.0;
+        audioDouble[2*i+1] = 0.0;
     }
-    for (int i = 0; i < num_samples_IR; i++) {
-        IRFloats[i] = shortToFloat(IR_data[i]);
-        //printf("\n IR: %f", IRFloats[i]);
+    double *IRDouble = (double *)calloc(2*K_input,sizeof(double));
+    for(int i=0; i< num_samples_IR; i++)
+    {
+        IRDouble[2*i] = (double)IR_data[i]/32768.0;
+        IRDouble[2*i+1] = 0.0;
     }
+
+
+
+
+    pad_zeros_to(audioDouble, 2*num_samples_input, 2*K_input);
+
+    // for(int f = 0; f<2*K_input; f++){
+    //     printf("%f\n", audioDouble[f]);
+    // }
+    pad_zeros_to(IRDouble, 2*num_samples_IR, K_input*2);
+    //Read in data and converting it to doubles from shorts
+
+    four1(audioDouble-1, K_input, 1);
+    four1(IRDouble-1, K_input, 1);
+
+    double *y = (double *)calloc(2*K_input,sizeof(double));
+
+    convolution(audioDouble,K_input,IRDouble,y);
+
+    four1(y-1,K_input,-1);
+    for(int k = 0, i=0; k<num_output; k++, i += 2)
+    {
+        //printf("scaling by %d",K_input);
+        y[i] /= (double)K_input;
+        y[i+1] /= (double)K_input;
+    }
+
+    //normalization:
+    double maxVal = y[0];
+
+    for (int i = 1; i < 2*K_input; i++) {
+        if (y[i] > maxVal) {
+            maxVal = y[i]; // Update max if a larger value is found
+        }
+    }
+
+     for(int k = 0, i=0; k<num_output; k++, i += 2)
+    {
+        //printf("scaling by %d",K_input);
+        y[i] /= (double)maxVal;
+        y[i+1] /= (double)maxVal;
+    }
+
+
+    // for (int i = 0; i < 2*K_input; i+=2) {
+    //     printf("\n%f ", y[i]);
+    // }
+    
 
     short data;
-    convolve(audioFloats, num_samples_input, IRFloats, num_samples_IR, outputFloats , num_output);
-    for (int i =0; i<num_output;i++){
-        data = (short)(outputFloats[i]*32768);
-        //printf("\n data: %d",data);
-        fwrite(&data,sizeof(data),1,outputFileStream);
-    }
+    for (int i = 0; i < 2*(num_samples_input+num_samples_IR-1); i+=2) { //only read in 
+        // printf("\nindex: %d", i);
+        data = (short)(y[i]*32768);
+        //printf("\n%d", data);
+        fwrite(&data,sizeof(data),1,outputFileStream);// Convert to short
+    }   
 
     free(audio_data);
-    free(audioFloats);
-    // free(IRFloats);
-    // Close the files
+    free(IR_data);
+    free(audioDouble);
+    free(IRDouble);
     fclose(inputFileStream);
     fclose(outputFileStream);
 }
 
-
-// float findMaxFloat(float arr[], int n) {
-//     if (n <= 0) {
-//         return -1; // Return an error value or handle this case as appropriate
-//     }
-
-//     float max = arr[0]; // Start with the first element as the maximum
-
-//     for (int i = 1; i < n; i++) {
-//         if (arr[i] > max) {
-//             max = arr[i]; // Update max if the current element is greater
-//         }
-//     }
-//     printf("max value is: %d", max);
-//     return max;
-// }
-
-
 float shortToFloat(short s) {
     // Convert to range from -1 to (just below) 1
-    return s / 32768.0/2;//scale down the numbers
+    return s / 32768.0;//scale down the numbers
 }
 
-void convolve(float x[], int N, float h[], int M, float y[], int P)
+void pad_zeros_to(double *arr, int current_length, int M) {
+    int padding = M - current_length;
+    for (int i = 0; i < padding; ++i) {
+        arr[current_length + i] = 0.0;
+    }
+}
+int next_power_of_2(int n) {
+    return pow(2, (int)(log2(n - 1) + 1));
+}
+void four1(double data[], int nn, int isign)
 {
-    int n,m;
+    unsigned long n, mmax, m, j, istep, i;
+    double wtemp, wr, wpr, wpi, wi, theta;
+    double tempr, tempi;
 
-    /* Clear Output Buffer y[] */
-    for (n=0; n < P; n++)
-    {
-        y[n] = 0.0;
+    n = nn << 1;
+    j = 1;
+
+    for (i = 1; i < n; i += 2) {
+	if (j > i) {
+	    SWAP(data[j], data[i]);
+	    SWAP(data[j+1], data[i+1]);
+	}
+	m = nn;
+	while (m >= 2 && j > m) {
+	    j -= m;
+	    m >>= 1;
+	}
+	j += m;
     }
 
-    /* Outer Loop: process each input value x[n] in turn */
-    for (n=0; n<N; n++){
-        /* Inner loop: process x[n] with each sample of h[n] */
-        for (m=0; m<M; m++){
-            y[n+m] += x[n] * h[m];
-        }
+    mmax = 2;
+    while (n > mmax) {
+	istep = mmax << 1;
+	theta = isign * (6.28318530717959 / mmax);
+	wtemp = sin(0.5 * theta);
+	wpr = -2.0 * wtemp * wtemp;
+	wpi = sin(theta);
+	wr = 1.0;
+	wi = 0.0;
+	for (m = 1; m < mmax; m += 2) {
+	    for (i = m; i <= n; i += istep) {
+		j = i + mmax;
+		tempr = wr * data[j] - wi * data[j+1];
+		tempi = wr * data[j+1] + wi * data[j];
+		data[j] = data[i] - tempr;
+		data[j+1] = data[i+1] - tempi;
+		data[i] += tempr;
+		data[i+1] += tempi;
+	    }
+	    wr = (wtemp = wr) * wpr - wi * wpi + wr;
+	    wi = wi * wpr + wtemp * wpi + wi;
+	}
+	mmax = istep;
     }
+    
 }
 
-void printFloatArray(const float arr[], int size) {
-    for (int i = 0; i < size; i++) {
-        printf("%.6f ", arr[i]);
-    }
-    printf("\n");
+void convolution(double *x, int K, double *h, double *y) {
+    // Perform the DFT
+    for (int k = 0, nn = 0; k < K; k++, nn += 2)
+    {
+	    y[nn] = ((x[nn] * h[nn]) - (x[nn+1] * h [nn+1]));
+	    y[nn+1] = ((x[nn] * h[nn+1]) + (x[nn+1] * h[nn]));
+	}
+    
 }
