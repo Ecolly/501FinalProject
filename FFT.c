@@ -218,7 +218,7 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     four1(y-1,K_input,-1);
     for(int k = 0, i=0; k<num_output; k++, i += 2)
     {
-        //printf("scaling by %d",K_input);
+        printf("scaling by %d",K_input);
         y[i] /= (double)K_input;
         y[i+1] /= (double)K_input;
     }
@@ -241,9 +241,9 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
 
     short data;
     for (int i = 0; i < 2*(num_samples_input+num_samples_IR-1); i+=2) { //only read in 
-        // printf("\nindex: %d", i);
+        printf("\nindex: %d", i);
         data = (short)(y[i]*32768);
-        //printf("\n%d", data);
+        printf("\n%d", data);
         fwrite(&data,sizeof(data),1,outputFileStream);// Convert to short
     }   
 
