@@ -182,21 +182,15 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     for(int i=0; i< num_samples_input; i++)
     {
         audioDouble[2*i] = audio_data[i]/32768.0;
+        audioDouble[2*i+1] = 0.0;
     }
-    for(int i=1; i< num_samples_input; i+=2)
-    {
-        
-    }
+   
     double *IRDouble = (double *)calloc(2*K_input,sizeof(double));
     for(int i=0; i< num_samples_IR; i++)
     {
         IRDouble[2*i] = (double)IR_data[i]/32768.0;
+        IRDouble[2*i+1] = 0.0;
     }
-    for(int i=1; i< num_samples_IR; i+=2)
-    {
-        IRDouble[i] = 0.0;
-    }
-
 
 
 
