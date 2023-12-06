@@ -178,26 +178,19 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     //start
     int K_input = next_power_of_2(2*num_samples_input); //could be just the max of 2 samples??
     
-    double *audioDouble = (double *)calloc(2*K_input,sizeof(double));
+    double *audioDouble = (double *)calloc((2*K_input),sizeof(double));
     for(int i=0; i< num_samples_input; i++)
     {
-        audioDouble[2*i] = audio_data[i]/32768.0;
+        audioDouble[(i<<1)*i] = audio_data[i]/32768.0;
+        audioDouble[(i<<1)*i+1] = 0.0;
     }
-    for(int i=1; i< num_samples_input; i+=2)
-    {
-        audioDouble[i] = 0.0;
-    }
+   
     double *IRDouble = (double *)calloc(2*K_input,sizeof(double));
     for(int i=0; i< num_samples_IR; i++)
     {
-        IRDouble[2*i] = (double)IR_data[i]/32768.0;
+        IRDouble[(i<<1)*i] = (double)IR_data[i]/32768.0;
+        IRDouble[(i<<1)*i+1] = 0.0;
     }
-    for(int i=1; i< num_samples_IR; i+=2)
-    {
-        IRDouble[i] = 0.0;
-    }
-
-
 
 
     pad_zeros_to(audioDouble, 2*num_samples_input, 2*K_input);
@@ -218,7 +211,6 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     four1(y-1,K_input,-1);
     for(int k = 0, i=0; k<num_output; k++, i += 2)
     {
-        printf("scaling by %d",K_input);
         y[i] /= (double)K_input;
         y[i+1] /= (double)K_input;
     }
@@ -241,9 +233,7 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
 
     short data;
     for (int i = 0; i < 2*(num_samples_input+num_samples_IR-1); i+=2) { //only read in 
-        printf("\nindex: %d", i);
         data = (short)(y[i]*32768);
-        printf("\n%d", data);
         fwrite(&data,sizeof(data),1,outputFileStream);// Convert to short
     }   
 
