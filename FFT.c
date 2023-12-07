@@ -178,15 +178,17 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     //start
     
     int K_input = next_power_of_2(2*num_samples_input); //could be just the max of 2 samples??
-    
-    double *audioDouble = (double *)calloc((2*K_input),sizeof(double));
+    int K_input2 = 2*K_input;
+    int num_samples_input2 = 2*num_samples_input;
+
+    double *audioDouble = (double *)calloc((K_input2),sizeof(double));
     for(int i=0; i< num_samples_input; i++)
     {
         audioDouble[(i<<1)] = audio_data[i]/32768.0;
         audioDouble[(i<<1)+1] = 0.0;
     }
    
-    double *IRDouble = (double *)calloc(2*K_input,sizeof(double));
+    double *IRDouble = (double *)calloc(K_input2,sizeof(double));
     for(int i=0; i< num_samples_IR; i++)
     {
         IRDouble[(i<<1)] = (double)IR_data[i]/32768.0;
@@ -194,18 +196,18 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     }
 
 
-    pad_zeros_to(audioDouble, 2*num_samples_input, 2*K_input);
+    pad_zeros_to(audioDouble, num_samples_input2, K_input2);
 
     // for(int f = 0; f<2*K_input; f++){
     //     printf("%f\n", audioDouble[f]);
     // }
-    pad_zeros_to(IRDouble, 2*num_samples_IR, K_input*2);
+    pad_zeros_to(IRDouble, num_samples_input2, K_input2);
     //Read in data and converting it to doubles from shorts
 
     four1(audioDouble-1, K_input, 1);
     four1(IRDouble-1, K_input, 1);
 
-    double *y = (double *)calloc(2*K_input,sizeof(double));
+    double *y = (double *)calloc(K_input2,sizeof(double));
 
     convolution(audioDouble,K_input,IRDouble,y);
 
@@ -219,7 +221,7 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
     //normalization:
     double maxVal = y[0];
 
-    for (int i = 1; i < 2*K_input; i++) {
+    for (int i = 1; i < K_input2; i++) {
         if (y[i] > maxVal) {
             maxVal = y[i]; // Update max if a larger value is found
         }
