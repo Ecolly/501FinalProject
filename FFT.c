@@ -176,6 +176,7 @@ void readTone(char *inputFileName, char *IRFileName, char *outputFileName){
 
 
     //start
+    
     int K_input = next_power_of_2(2*num_samples_input); //could be just the max of 2 samples??
     
     double *audioDouble = (double *)calloc((2*K_input),sizeof(double));
@@ -252,9 +253,14 @@ float shortToFloat(short s) {
 
 void pad_zeros_to(double *arr, int current_length, int M) {
     int padding = M - current_length;
-    for (int i = 0; i < padding; ++i) {
+    int i = 0;
+    for (i = 0; i < padding-1; i+=2) {
         arr[current_length + i] = 0.0;
+        arr[current_length + i+1] = 0.0;
     }
+    if(i== padding-1)
+        arr[padding-1] = padding-1;
+
 }
 int next_power_of_2(int n) {
     return pow(2, (int)(log2(n - 1) + 1));
